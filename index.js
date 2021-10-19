@@ -9,10 +9,10 @@ const csvToJson = require('csvToJson');
 const csvFilePath = path.join(__dirname, './ZipCodes.csv');
 const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
 const baseQuery = {
-  start: '20160101',
-  end: '20210101',
+  start: '20210101',
+  end: '20210701',
   community: 'AG',
-  parameters: 'T2M',
+  parameters: 'T2M,PRECTOTCORR',
   longitude: null,
   latitude: null,
 };
@@ -25,25 +25,49 @@ const getWeatherData = async (lat, lon) => {
   console.log(`Awaiting response...`);
   const res = await request.get(baseUrl).query(query);
   console.log('Response received');
-  return res.body.properties.parameter.T2M;
+  return res.body.properties.parameter;
+};
+
+const dateToDayOfYear = (date) => {
+  const start = new Date(date.getFullYear(), 0, 0);
+  const diff = date - start + (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000;
+  const oneDay = 1000 * 60 * 60 * 24;
+  const day = Math.floor(diff / oneDay);
+  return day;
 };
 
 // For one zipcode, create a csv and fill it with temperature data
-const generateOne = async (zipcode, lat, lon) => {
+const generateOne = async (zipcode, lat, lon, city, office) => {
   const buffer = [];
-  const weatherData = await getWeatherData(lat, lon);
-  Object.keys(weatherData).forEach((dateString) => {
-    const temperature = weatherData[dateString];
+  const { T2M: temperatureData, PRECTOTCORR: precipitationData } = await getWeatherData(lat, lon);
+  Object.keys(temperatureData).forEach((dateString) => {
+    const temperature = temperatureData[dateString];
+    const precipitation = precipitationData[dateString];
+
+    const year = dateString.slice(0, 4);
+    const month = dateString.slice(4, 6);
+    const day = dateString.slice(6, 8);
+
+    const dateObject = new Date();
+    dateObject.setFullYear(year);
+    dateObject.setMonth(month - 1); // JS works with months from 0-11
+    dateObject.setDate(day);
+
+    const dayOfYear = dateToDayOfYear(dateObject);
+
     buffer.push({
-      date: dateString,
+      dayOfYear: dayOfYear,
       zipcode,
+      city: city || 'N/A',
+      office: office || 'N/A',
       latitude: lat,
       longitude: lon,
       temperature,
+      precipitation,
     });
   });
 
-  const fields = ['date', 'zipcode', 'latitude', 'longitude', 'temperature'];
+  const fields = ['dayOfYear', 'zipcode', 'city', 'office', 'latitude', 'longitude', 'temperature', 'precipitation'];
   const options = { fields };
 
   try {
@@ -68,9 +92,9 @@ const generate = async () => {
   // loop over zipcodes and fill buffer
   for (const index in jsonZipcodes) {
     const row = jsonZipcodes[index];
-    const { ZipCode: zipcode, Latitude: lat, Longitude: lon } = row;
+    const { ZipCode: zipcode, Latitude: lat, Longitude: lon, City: city, Office: office } = row;
 
-    await generateOne(zipcode, lat, lon);
+    await generateOne(zipcode, lat, lon, city, office);
   }
 
   console.info("Done generating csv's");
