@@ -9,8 +9,8 @@ const csvToJson = require('csvToJson');
 const csvFilePath = path.join(__dirname, './ZipCodes.csv');
 const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
 const baseQuery = {
-  start: '20210101',
-  end: '20210701',
+  start: '20010101',
+  end: '20210101',
   community: 'AG',
   parameters: 'T2M,PRECTOTCORR',
   longitude: null,
