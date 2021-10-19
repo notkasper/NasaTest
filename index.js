@@ -22,9 +22,9 @@ const toJson = csvToJson({ delimiter: ';' });
 
 const getWeatherData = async (lat, lon) => {
   const query = { ...baseQuery, latitude: lat, longitude: lon };
-  console.log(`Awaiting response...`);
+  console.info(`Awaiting response...`);
   const res = await request.get(baseUrl).query(query);
-  console.log('Response received');
+  console.info('Response received');
   return res.body.properties.parameter;
 };
 
@@ -36,10 +36,44 @@ const dateToDayOfYear = (date) => {
   return day;
 };
 
+const geocode = async (office, city, zipcode) => {
+  const googleGeocodeApiBaseUrl = 'http://api.positionstack.com/v1/forward';
+  const key = 'fb1c96a991dc27bf030202914c73819f';
+  const address = `${zipcode}, ${city}, ${office}`;
+
+  let response = null;
+  try {
+    response = await request.get(googleGeocodeApiBaseUrl).query({ query: address, access_key: key });
+  } catch (error) {
+    console.error(error.response.body);
+    return null;
+  }
+
+  // in case geocoding did not give any results
+  if (!response.body.data.length) {
+    return null;
+  }
+
+  let best = response.body.data[0];
+  response.body.data.forEach((option) => {
+    if (option.confidence > best.confidence) {
+      best = option;
+    }
+  });
+  return [best.latitude, best.longitude];
+};
+
 // For one zipcode, create a csv and fill it with temperature data
 const generateOne = async (zipcode, lat, lon, city, office) => {
   const buffer = [];
-  const { T2M: temperatureData, PRECTOTCORR: precipitationData } = await getWeatherData(lat, lon);
+  let response = null;
+  try {
+    response = await getWeatherData(lat, lon);
+  } catch (error) {
+    console.error(error.response.body);
+    return;
+  }
+  const { T2M: temperatureData, PRECTOTCORR: precipitationData } = response;
   Object.keys(temperatureData).forEach((dateString) => {
     const temperature = temperatureData[dateString];
     const precipitation = precipitationData[dateString];
@@ -92,9 +126,16 @@ const generate = async () => {
   // loop over zipcodes and fill buffer
   for (const index in jsonZipcodes) {
     const row = jsonZipcodes[index];
-    const { ZipCode: zipcode, Latitude: lat, Longitude: lon, City: city, Office: office } = row;
+    const { ZipCode: zipcode, City: city, Office: office } = row;
+    const geocodeResult = await geocode(office, city, zipcode);
 
-    await generateOne(zipcode, lat, lon, city, office);
+    if (!geocodeResult) {
+      console.info(`Could not geocode:\n ${JSON.stringify(row)}`);
+      continue;
+    }
+
+    const [latitude, longitude] = geocodeResult;
+    await generateOne(zipcode, latitude, longitude, city, office);
   }
 
   console.info("Done generating csv's");
