@@ -93,7 +93,7 @@ const generateOne = async (zipcode, lat, lon, city, office) => {
       dayOfYear: dayOfYear,
       zipcode,
       city: city || 'N/A',
-      office: office || 'N/A',
+      country: office || 'N/A',
       latitude: lat,
       longitude: lon,
       temperature,
@@ -101,12 +101,18 @@ const generateOne = async (zipcode, lat, lon, city, office) => {
     });
   });
 
-  const fields = ['dayOfYear', 'zipcode', 'city', 'office', 'latitude', 'longitude', 'temperature', 'precipitation'];
+  const fields = ['dayOfYear', 'zipcode', 'city', 'country', 'latitude', 'longitude', 'temperature', 'precipitation'];
   const options = { fields };
 
   try {
     const csv = toCsv(buffer, options);
-    const filepath = `${outputDir}/${zipcode}.csv`;
+
+    // make sure country folder exists
+    if (!fs.existsSync(`${outputDir}/${office}`)) {
+      fs.mkdirSync(`${outputDir}/${office}`);
+    }
+
+    const filepath = `${outputDir}/${office}/[${latitude}][${longitude}].csv`;
     fs.writeFileSync(filepath, csv);
   } catch (err) {
     console.error(err);
