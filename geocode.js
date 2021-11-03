@@ -41,9 +41,16 @@ const generate = async () => {
   const jsonZipcodes = await toJson.fromFile(csvFilePath);
   const buffer = [];
   const failedBuffer = [];
+  let failStreak = 0;
+  let lastIndex = 0;
 
   // loop over zipcodes and fill buffer
   for (const index in jsonZipcodes) {
+    if (failStreak > 10) {
+      // terminate the program gracefully and write a log
+      continue;
+    }
+    lastIndex = index;
     const row = jsonZipcodes[index];
     const { ZipCode: zipcode, City: city, Office: office } = row;
     const geocodeResult = await geocode(office, city, zipcode);
@@ -51,8 +58,10 @@ const generate = async () => {
     if (!geocodeResult) {
       console.info(`Could not geocode:\n ${JSON.stringify(row)}`);
       failedBuffer.push({ zipcode, city, office });
+      failStreak += 1;
       continue;
     }
+    failStreak = 0;
 
     const [latitude, longitude] = geocodeResult;
     buffer.push({ zipcode, city, office, latitude, longitude });
@@ -69,6 +78,7 @@ const generate = async () => {
     const failedFilepath = 'failedZipcodes.csv';
     fs.writeFileSync(filepath, csv);
     fs.writeFileSync(failedFilepath, failedCsv);
+    fs.writeFileSync(path.join(__dirname, 'log.txt'), lastIndex);
   } catch (err) {
     console.error(err);
   }
