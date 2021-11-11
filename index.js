@@ -1,49 +1,54 @@
 // imports
-const request = require('superagent');
-const path = require('path');
-const fs = require('fs');
-const { parse: toCsv } = require('json2csv');
-const csvToJson = require('csvToJson');
+const request = require("superagent");
+const path = require("path");
+const fs = require("fs");
+const { parse: toCsv } = require("json2csv");
+const csvToJson = require("csvToJson");
 
 // settings
-const csvFilePath = path.join(__dirname, './ZipCodes.csv');
-const baseUrl = 'https://power.larc.nasa.gov/api/temporal/daily/point';
+const csvFilePath = path.join(__dirname, "./ZipCodes.csv");
+const baseUrl = "https://power.larc.nasa.gov/api/temporal/daily/point";
 const baseQuery = {
-  start: '20010101',
-  end: '20210101',
-  community: 'AG',
-  parameters: 'T2M,PRECTOTCORR',
+  start: "20010101",
+  end: "20210101",
+  community: "AG",
+  parameters: "T2M,PRECTOTCORR",
   longitude: null,
   latitude: null,
 };
-const outputDir = './output';
+const outputDir = "./output";
 
-const toJson = csvToJson({ delimiter: ';' });
+const toJson = csvToJson({ delimiter: ";" });
 
 const getWeatherData = async (lat, lon) => {
   const query = { ...baseQuery, latitude: lat, longitude: lon };
   console.info(`Awaiting response...`);
   const res = await request.get(baseUrl).query(query);
-  console.info('Response received');
+  console.info("Response received");
   return res.body.properties.parameter;
 };
 
 const dateToDayOfYear = (date) => {
   const start = new Date(date.getFullYear(), 0, 0);
-  const diff = date - start + (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000;
+  const diff =
+    date -
+    start +
+    (start.getTimezoneOffset() - date.getTimezoneOffset()) * 60 * 1000;
   const oneDay = 1000 * 60 * 60 * 24;
   const day = Math.floor(diff / oneDay);
   return day;
 };
 
 const geocode = async (office, city, zipcode) => {
-  const googleGeocodeApiBaseUrl = 'http://api.positionstack.com/v1/forward';
-  const key = 'fb1c96a991dc27bf030202914c73819f';
+  const googleGeocodeApiBaseUrl = "http://api.positionstack.com/v1/forward";
+  const key = "fb1c96a991dc27bf030202914c73819f";
   const address = `${zipcode}, ${city}, ${office}`;
 
   let response = null;
   try {
-    response = await request.get(googleGeocodeApiBaseUrl).query({ query: address, access_key: key });
+    response = await request
+      .get(googleGeocodeApiBaseUrl)
+      .query({ query: address, access_key: key });
   } catch (error) {
     console.error(error.response.body);
     return null;
@@ -92,8 +97,8 @@ const generateOne = async (zipcode, lat, lon, city, office) => {
     buffer.push({
       dayOfYear: dayOfYear,
       zipcode,
-      city: city || 'N/A',
-      country: office || 'N/A',
+      city: city || "N/A",
+      country: office || "N/A",
       latitude: lat,
       longitude: lon,
       temperature,
@@ -101,7 +106,16 @@ const generateOne = async (zipcode, lat, lon, city, office) => {
     });
   });
 
-  const fields = ['dayOfYear', 'zipcode', 'city', 'country', 'latitude', 'longitude', 'temperature', 'precipitation'];
+  const fields = [
+    "dayOfYear",
+    "zipcode",
+    "city",
+    "country",
+    "latitude",
+    "longitude",
+    "temperature",
+    "precipitation",
+  ];
   const options = { fields };
 
   try {
