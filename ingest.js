@@ -8,10 +8,19 @@ const cliProgress = require("cli-progress");
 
 const RATE_LIMIT = 50; // Allowed amount of calls per minute
 const OUTPUT_BASE_DIR = path.join(__dirname, "./output");
+const LOG_DIR = `${OUTPUT_BASE_DIR}/logs`;
 const INGEST_OUTPUT = `${OUTPUT_BASE_DIR}/csvPerCountry`;
 const TEMP_PATH = `${OUTPUT_BASE_DIR}/temp`;
 const START_DATE = "20210101";
 const END_DATE = "20210103";
+
+const logData = (data) => {
+  const filename = `${new Date(Date.now())
+    .toISOString()
+    .substring(0, 13)}_${uuid.v4()}.txt`;
+  const filepath = path.join(LOG_DIR, filename);
+  fs.writeFileSync(filepath, data);
+};
 
 const sortByCountry = (jsonZipcodes) => {
   const locationsPerCountry = {};
@@ -110,12 +119,13 @@ const ingestCountry = async (country, locations, tries = 0) => {
     fs.mkdirSync(`${TEMP_PATH}/${country}`);
   }
 
+  const progressBar = new cliProgress.SingleBar(
+    {},
+    cliProgress.Presets.shades_classic
+  );
+  progressBar.start(locationBatches.length, 0);
   try {
-    const progressBar = new cliProgress.SingleBar(
-      {},
-      cliProgress.Presets.shades_classic
-    );
-    progressBar.start(locationBatches.length, 0);
+    throw new Error("JIDMAD");
 
     for (const locationBatch of locationBatches) {
       const startTime = new Date(); // keep track of time to avoid rate limit
@@ -130,15 +140,19 @@ const ingestCountry = async (country, locations, tries = 0) => {
 
       progressBar.increment();
     }
-    progressBar.stop();
   } catch (error) {
+    logData(`ERROR_INGESTING_COUNTRY_${country}\n${error.toString()}`);
     if (tries <= 3) {
+      logData(`RETRYING ${country} RETRY NR: ${tries}`);
       tries += 1;
       await wait(60 * 1000);
       await ingestCountry(country, locations, tries);
     } else {
+      logData(`MAX_RETRIES_${country}`);
       return;
     }
+  } finally {
+    progressBar.stop();
   }
 };
 
@@ -200,6 +214,11 @@ const start = async () => {
   //   make sure output folder exists
   if (!fs.existsSync(INGEST_OUTPUT)) {
     fs.mkdirSync(INGEST_OUTPUT);
+  }
+
+  //   make sure output folder exists
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR);
   }
 
   //   ingest all data
