@@ -13,11 +13,6 @@ const TEMP_PATH = `${OUTPUT_BASE_DIR}/temp`;
 const START_DATE = "20210101";
 const END_DATE = "20210103";
 
-const progressBar = new cliProgress.SingleBar(
-  {},
-  cliProgress.Presets.shades_classic
-);
-
 const sortByCountry = (jsonZipcodes) => {
   const locationsPerCountry = {};
 
@@ -31,14 +26,14 @@ const sortByCountry = (jsonZipcodes) => {
     locationsPerCountry[country].push(row);
   }
 
+  const meta = Object.keys(locationsPerCountry).map((country) => ({
+    country,
+    locations: locationsPerCountry[country].length,
+  }));
+  console.table(meta);
+
   return locationsPerCountry;
 };
-
-// const transformResponse = (response, parameters) => {
-//     const parameterResponses = response.body.properties.parameter
-//     const dates = parameterResponses[parameters[0]] // Bit ugly, but now we can loo
-//     return {}
-// }
 
 const getLocation = async (location) => {
   const { longitude, latitude, zipcode, country, city } = location;
@@ -116,6 +111,12 @@ const ingestCountry = async (country, locations, tries = 0) => {
   }
 
   try {
+    const progressBar = new cliProgress.SingleBar(
+      {},
+      cliProgress.Presets.shades_classic
+    );
+    progressBar.start(locationBatches.length, 0);
+
     for (const locationBatch of locationBatches) {
       const startTime = new Date(); // keep track of time to avoid rate limit
       await getBatch(locationBatch);
@@ -126,7 +127,10 @@ const ingestCountry = async (country, locations, tries = 0) => {
       if (timeToWaitMs > 0) {
         await wait(timeToWaitMs);
       }
+
+      progressBar.increment();
     }
+    progressBar.stop();
   } catch (error) {
     if (tries <= 3) {
       tries += 1;
@@ -166,13 +170,10 @@ const saveCountry = async (data, filepath) => {
 
 const ingestAll = async (locationsPerCountry) => {
   const countries = Object.keys(locationsPerCountry);
-  progressBar.start(countries.length, 0);
   for (const country of countries) {
     const locations = locationsPerCountry[country];
     await ingestCountry(country, locations);
-    progressBar.increment();
   }
-  progressBar.stop();
 };
 
 const start = async () => {
