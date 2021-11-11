@@ -125,8 +125,6 @@ const ingestCountry = async (country, locations, tries = 0) => {
   );
   progressBar.start(locationBatches.length, 0);
   try {
-    throw new Error("JIDMAD");
-
     for (const locationBatch of locationBatches) {
       const startTime = new Date(); // keep track of time to avoid rate limit
       await getBatch(locationBatch);
