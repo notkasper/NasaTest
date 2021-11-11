@@ -102,7 +102,7 @@ const batchify = (arr, batchSize) => {
   return batches;
 };
 
-const ingestCountry = async (country, locations) => {
+const ingestCountry = async (country, locations, tries = 0) => {
   const locationBatches = batchify(locations, RATE_LIMIT);
 
   // make sure country folder exists
@@ -115,15 +115,25 @@ const ingestCountry = async (country, locations) => {
     fs.mkdirSync(`${TEMP_PATH}/${country}`);
   }
 
-  for (const locationBatch of locationBatches) {
-    const startTime = new Date(); // keep track of time to avoid rate limit
-    await getBatch(locationBatch);
-    const endTime = new Date();
-    const elapsedTime = endTime.getTime() - startTime.getTime();
-    const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
+  try {
+    for (const locationBatch of locationBatches) {
+      const startTime = new Date(); // keep track of time to avoid rate limit
+      await getBatch(locationBatch);
+      const endTime = new Date();
+      const elapsedTime = endTime.getTime() - startTime.getTime();
+      const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
 
-    if (timeToWaitMs > 0) {
-      await wait(timeToWaitMs);
+      if (timeToWaitMs > 0) {
+        await wait(timeToWaitMs);
+      }
+    }
+  } catch (error) {
+    if (tries <= 3) {
+      tries += 1;
+      await wait(60 * 1000);
+      await ingestCountry(country, locations, tries);
+    } else {
+      return;
     }
   }
 };
