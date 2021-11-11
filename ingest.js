@@ -4,6 +4,7 @@ const uuid = require("uuid");
 const request = require("superagent");
 const csvToJson = require("csvToJson");
 const { parse: toCsv } = require("json2csv");
+const cliProgress = require("cli-progress");
 
 const RATE_LIMIT = 50; // Allowed amount of calls per minute
 const OUTPUT_BASE_DIR = path.join(__dirname, "./output");
@@ -11,6 +12,11 @@ const INGEST_OUTPUT = `${OUTPUT_BASE_DIR}/csvPerCountry`;
 const TEMP_PATH = `${OUTPUT_BASE_DIR}/temp`;
 const START_DATE = "20210101";
 const END_DATE = "20210103";
+
+const progressBar = new cliProgress.SingleBar(
+  {},
+  cliProgress.Presets.shades_classic
+);
 
 const sortByCountry = (jsonZipcodes) => {
   const locationsPerCountry = {};
@@ -55,9 +61,7 @@ const getLocation = async (location) => {
     format: "CSV",
   };
 
-  console.info(`Awaiting response...`);
   const response = await request.get(baseUrl).query(query);
-  console.info("Response received");
   const csvData = response.text.split("-END HEADER-")[1].trim(); // Remove meta data located above headers
 
   const tempFilename = `${country}-${zipcode}-${city}-${START_DATE}-${END_DATE}-RAW`;
@@ -119,7 +123,6 @@ const ingestCountry = async (country, locations) => {
     const timeToWaitMs = RATE_LIMIT - elapsedTime;
 
     if (timeToWaitMs > 0) {
-      console.log(`Gonna wait ${Math.ceil(timeToWaitMs / 1000)} seconds`);
       await wait(timeToWaitMs);
     }
   }
@@ -153,10 +156,13 @@ const saveCountry = async (data, filepath) => {
 
 const ingestAll = async (locationsPerCountry) => {
   const countries = Object.keys(locationsPerCountry);
+  progressBar.start(countries.length, 0);
   for (const country of countries) {
     const locations = locationsPerCountry[country];
     await ingestCountry(country, locations);
+    progressBar.increment();
   }
+  progressBar.stop();
 };
 
 const start = async () => {
