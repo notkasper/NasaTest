@@ -6,7 +6,7 @@ const csvToJson = require("csvToJson");
 const { parse: toCsv } = require("json2csv");
 const cliProgress = require("cli-progress");
 
-const RATE_LIMIT = 60; // Allowed amount of calls per minute
+const RATE_LIMIT = 2; // Allowed amount of calls per minute
 const OUTPUT_BASE_DIR = path.join(__dirname, "./output");
 const LOG_DIR = `${OUTPUT_BASE_DIR}/logs`;
 const INGEST_OUTPUT = `${OUTPUT_BASE_DIR}/csvPerCountry`;
@@ -135,8 +135,16 @@ const ingestCountry = async (country, locations) => {
   progressBar.start(locationBatches.length, 0);
 
   const helper = async (locationBatch) => {
+    const startTime = new Date(); // keep track of time to avoid rate limit
     await getBatch(locationBatch);
-    await wait(65 * 1000); // Avoid rate limit
+    const endTime = new Date();
+    const elapsedTime = endTime.getTime() - startTime.getTime();
+    const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
+
+    if (timeToWaitMs > 0) {
+      await wait(timeToWaitMs);
+    }
+
     progressBar.increment();
   };
 
@@ -147,7 +155,7 @@ const ingestCountry = async (country, locations) => {
 
     while (batchRetries <= 3 && !batchCompleted) {
       try {
-        helper(locationBatch);
+        await helper(locationBatch);
         batchCompleted = true;
       } catch (error) {
         logData(
