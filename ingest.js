@@ -15,11 +15,16 @@ const START_DATE = "20210101";
 const END_DATE = "20210103";
 
 const logData = (data) => {
-  const filename = `${new Date(Date.now())
-    .toISOString()
-    .substring(0, 13)}_${uuid.v4()}.txt`;
+  const filename = cleanFilename(
+    `${new Date(Date.now()).toISOString().substring(0, 13)}_${uuid.v4()}.txt`
+  );
   const filepath = path.join(LOG_DIR, filename);
   fs.writeFileSync(filepath, data);
+};
+
+const cleanFilename = (name) => {
+  name = name.replace(/\s+/gi, "-"); // Replace white space with dash
+  return name.replace(/[^a-zA-Z0-9\-]/gi, ""); // Strip any special charactere
 };
 
 const sortByCountry = (jsonZipcodes) => {
@@ -68,7 +73,9 @@ const getLocation = async (location) => {
   const response = await request.get(baseUrl).query(query);
   const csvData = response.text.split("-END HEADER-")[1].trim(); // Remove meta data located above headers
 
-  const tempFilename = `${country}-${zipcode}-${city}-${START_DATE}-${END_DATE}-RAW`;
+  const tempFilename = cleanFilename(
+    `${country}-${zipcode}-${city}-${START_DATE}-${END_DATE}-RAW`
+  );
   const tempFilePath = `${TEMP_PATH}/${country}/${tempFilename}.csv`;
   await fs.promises.writeFile(tempFilePath, csvData);
 
@@ -82,7 +89,9 @@ const getLocation = async (location) => {
     country,
     city,
   }));
-  const filename = `${country}-${zipcode}-${city}-${START_DATE}-${END_DATE}`;
+  const filename = cleanFilename(
+    `${country}-${zipcode}-${city}-${START_DATE}-${END_DATE}`
+  );
   const filepath = `${INGEST_OUTPUT}/${country}/${filename}.csv`;
   await saveCountry(enrichedResponse, filepath);
 };
