@@ -115,7 +115,7 @@ const batchify = (arr, batchSize) => {
   return batches;
 };
 
-const ingestCountry = async (country, locations, tries = 0) => {
+const ingestCountry = async (country, locations) => {
   const locationBatches = batchify(locations, RATE_LIMIT);
 
   // make sure country folder exists
@@ -133,34 +133,49 @@ const ingestCountry = async (country, locations, tries = 0) => {
     cliProgress.Presets.shades_classic
   );
   progressBar.start(locationBatches.length, 0);
-  try {
-    for (const locationBatch of locationBatches) {
-      const startTime = new Date(); // keep track of time to avoid rate limit
-      await getBatch(locationBatch);
-      const endTime = new Date();
-      const elapsedTime = endTime.getTime() - startTime.getTime();
-      const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
 
-      if (timeToWaitMs > 0) {
-        await wait(timeToWaitMs);
+  const helper = async (locationBatch) => {
+    const startTime = new Date(); // keep track of time to avoid rate limit
+    await getBatch(locationBatch);
+    const endTime = new Date();
+    const elapsedTime = endTime.getTime() - startTime.getTime();
+    const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
+
+    if (timeToWaitMs > 0) {
+      await wait(timeToWaitMs);
+    }
+
+    progressBar.increment();
+  };
+
+  let index = 0;
+  for (const locationBatch of locationBatches) {
+    let batchRetries = 0;
+    let batchCompleted = false;
+
+    while (batchRetries <= 3 && !batchCompleted) {
+      try {
+        helper(locationBatch);
+        batchCompleted = true;
+      } catch (error) {
+        logData(
+          `ERROR_INGESTING_COUNTRY_BATCH_${country}\n${error.toString()}`
+        );
+        batchRetries += 1;
+        await wait(65 * 1000);
       }
+    }
 
-      progressBar.increment();
+    if (!batchCompleted) {
+      logData(
+        `FAILED TO INGEST BATCH ${index}/${locationBatches.length} FOR COUNTRY ${country}`
+      );
     }
-  } catch (error) {
-    logData(`ERROR_INGESTING_COUNTRY_${country}\n${error.toString()}`);
-    if (tries <= 3) {
-      logData(`RETRYING ${country} RETRY NR: ${tries}`);
-      tries += 1;
-      await wait(60 * 1000);
-      await ingestCountry(country, locations, tries);
-    } else {
-      logData(`MAX_RETRIES_${country}`);
-      return;
-    }
-  } finally {
-    progressBar.stop();
+
+    index += 1;
   }
+
+  progressBar.stop();
 };
 
 const saveCountry = async (data, filepath) => {
