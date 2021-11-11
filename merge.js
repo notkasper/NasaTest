@@ -50,7 +50,6 @@ const mergeFolder = async (directory, country) => {
     const filePath = path.join(folder.path, file.name);
     const data = await toJson.fromFile(filePath);
     buffer = buffer.concat(data);
-    await wait(1000);
     progressBar.increment();
   }
 
