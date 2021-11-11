@@ -120,7 +120,7 @@ const ingestCountry = async (country, locations) => {
     await getBatch(locationBatch);
     const endTime = new Date();
     const elapsedTime = endTime.getTime() - startTime.getTime();
-    const timeToWaitMs = RATE_LIMIT - elapsedTime;
+    const timeToWaitMs = RATE_LIMIT - elapsedTime + 5 * 1000;
 
     if (timeToWaitMs > 0) {
       await wait(timeToWaitMs);
