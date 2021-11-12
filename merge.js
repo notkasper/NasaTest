@@ -27,31 +27,28 @@ const mergeFolder = async (directory, country) => {
       const reader = readline.createInterface(readStream, writer);
       let firstRow = true;
 
-      const writeLine = async (line) => {
-        return new Promise((resolve) => {
-          const res = writer.write(`${line}\n`);
-          if (!res) {
-            writer.once("drain", async () => {
-              await writeLine(line);
-              resolve();
-            });
-          } else {
-            resolve();
-          }
-        });
-      };
+      writer.on("drain", () => {
+        reader.resume();
+      });
 
       reader.on("line", async (line) => {
         if (firstRow && firstFile) {
           firstRow = false;
-          await writeLine(line);
+          const res = writer.write(`${line}\n`);
+          if (!res) {
+            reader.pause();
+          }
         } else if (!firstRow) {
-          await writeLine(line);
+          const res = writer.write(`${line}\n`);
+          if (!res) {
+            reader.pause();
+          }
         } else if (!firstFile && firstRow) {
           firstRow = false;
         }
       });
       reader.on("close", () => {
+        writer.removeAllListeners();
         resolve();
       });
     });
