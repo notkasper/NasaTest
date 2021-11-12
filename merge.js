@@ -1,43 +1,16 @@
 // imports
 const path = require("path");
 const fs = require("fs");
-const { parse: toCsv } = require("json2csv");
-const csvToJson = require("csvToJson");
+const readline = require("readline");
 const cliProgress = require("cli-progress");
 
 const OUTPUT_BASE_DIR = path.join(__dirname, "./output");
 const MERGE_OUTPUT = `${OUTPUT_BASE_DIR}/merged`;
 const INGEST_OUTPUT = `${OUTPUT_BASE_DIR}/csvPerCountry`;
 
-const wait = async (timeout) => {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve();
-    }, timeout);
-  });
-};
-
 const mergeFolder = async (directory, country) => {
   const folder = await fs.promises.opendir(directory);
   const amountOfFiles = (await fs.promises.readdir(directory)).length;
-
-  let buffer = [];
-  const fields = [
-    "YEAR",
-    "DOY",
-    "T2M",
-    "PRECTOTCORR",
-    "RH2M",
-    "GWETROOT",
-    "GWETPROF",
-    "T2MWET",
-    "zipcode",
-    "city",
-    "country",
-    "latitude",
-    "longitude",
-  ];
-  const options = { fields };
 
   const progressBar = new cliProgress.SingleBar(
     {},
@@ -45,17 +18,39 @@ const mergeFolder = async (directory, country) => {
   );
   progressBar.start(amountOfFiles, 0);
 
+  const filepath = path.join(MERGE_OUTPUT, `${country}.csv`);
+  const writer = fs.createWriteStream(filepath);
+
+  const readFile = async (filePath, firstFile, writer) => {
+    return new Promise((resolve, reject) => {
+      const readStream = fs.createReadStream(filePath);
+      const reader = readline.createInterface(readStream, writer);
+      let firstRow = true;
+      reader.on("line", (line) => {
+        if (firstRow && firstFile) {
+          firstRow = false;
+          writer.write(line);
+          writer.write("\n");
+        } else if (!firstRow) {
+          writer.write(line);
+          writer.write("\n");
+        } else if (!firstFile && firstRow) {
+          firstRow = false;
+        }
+      });
+      reader.on("close", () => {
+        resolve();
+      });
+    });
+  };
+
+  let firstFile = true;
   for await (const file of folder) {
-    const toJson = csvToJson();
-    const filePath = path.join(folder.path, file.name);
-    const data = await toJson.fromFile(filePath);
-    buffer = buffer.concat(data);
+    const fileToRead = path.join(folder.path, file.name);
+    await readFile(fileToRead, firstFile, writer);
+    firstFile = false;
     progressBar.increment();
   }
-
-  const csv = toCsv(buffer, options);
-  const filepath = path.join(MERGE_OUTPUT, `${country}.csv`);
-  await fs.promises.writeFile(filepath, csv);
   progressBar.stop();
 };
 
