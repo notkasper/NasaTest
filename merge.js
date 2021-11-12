@@ -26,14 +26,23 @@ const mergeFolder = async (directory, country) => {
       const readStream = fs.createReadStream(filePath);
       const reader = readline.createInterface(readStream, writer);
       let firstRow = true;
+
+      const writeLine = async (line) => {
+        return new Promise((resolve) => {
+          const res = writer.write(`${line}\n`);
+          if (!res) {
+            writer.on("drain", resolve);
+          }
+          resolve();
+        });
+      };
+
       reader.on("line", (line) => {
         if (firstRow && firstFile) {
           firstRow = false;
-          writer.write(line);
-          writer.write("\n");
+          await writeLine(line);
         } else if (!firstRow) {
-          writer.write(line);
-          writer.write("\n");
+          await writeLine(line);
         } else if (!firstFile && firstRow) {
           firstRow = false;
         }
