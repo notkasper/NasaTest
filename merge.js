@@ -28,6 +28,7 @@ const mergeFolder = async (directory, country) => {
       let firstRow = true;
 
       writer.on("drain", () => {
+        console.log("resumed");
         reader.resume();
       });
 
@@ -36,11 +37,13 @@ const mergeFolder = async (directory, country) => {
           firstRow = false;
           const res = writer.write(`${line}\n`);
           if (!res) {
+            console.log("paused");
             reader.pause();
           }
         } else if (!firstRow) {
           const res = writer.write(`${line}\n`);
           if (!res) {
+            console.log("paused");
             reader.pause();
           }
         } else if (!firstFile && firstRow) {
