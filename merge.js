@@ -37,7 +37,7 @@ const mergeFolder = async (directory, country) => {
         });
       };
 
-      reader.on("line", (line) => {
+      reader.on("line", async (line) => {
         if (firstRow && firstFile) {
           firstRow = false;
           await writeLine(line);
