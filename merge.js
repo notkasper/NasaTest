@@ -31,9 +31,13 @@ const mergeFolder = async (directory, country) => {
         return new Promise((resolve) => {
           const res = writer.write(`${line}\n`);
           if (!res) {
-            writer.on("drain", resolve);
+            writer.once("drain", async () => {
+              await writeLine(line);
+              resolve();
+            });
+          } else {
+            resolve();
           }
-          resolve();
         });
       };
 
